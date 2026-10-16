@@ -1,0 +1,2 @@
+# Patch topics in stacking order: <topic> base=<upstream sha> pr=<user-fork branch>|local [guard=<table>.<column>,…]
+# Each topic is branch patch/<topic>; fork-sync rebases them onto the target release in this order.
