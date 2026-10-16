@@ -1,0 +1,5 @@
+# github.com publication (kubernetes/forgejo README "Opt-in GitHub publication"): the public
+# source of every fork release (AGPL §13 source offer; git dependency of PractiCal).
+# Issues and pull requests belong upstream: github.com/lennart-k/rustical.
+description: xarif fork of lennart-k/rustical (RustiCal) — upstream releases plus a few changes offered upstream; see XARIF.md
+homepage: https://github.com/lennart-k/rustical
