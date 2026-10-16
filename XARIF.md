@@ -3,7 +3,7 @@
 This is a modified version of [RustiCal](https://github.com/lennart-k/rustical) by
 Lennart Kämmle, licensed under the AGPL-3.0-or-later like the original.
 **Modified by xarif since 2026-10-16.** The changes are listed in
-[`.xarif/series`](.xarif/series); each one is a branch `patch/<topic>`.
+[`.xarif/series`](.xarif/series); each one is the ref `refs/xarif/patch/<topic>`.
 
 The fork exists for changes that the upstream project has not taken yet. Each change
 is also offered upstream as a pull request. Once upstream releases it, the fork drops
@@ -20,7 +20,7 @@ it again.
 | Ref | Meaning |
 |---|---|
 | `xarif` | default branch: an upstream release + every patch topic + this infra layer. Changes only through pull requests. |
-| `patch/<topic>` | one change, shaped like an upstream pull request (no xarif files) |
+| `refs/xarif/patch/<topic>` | one change, shaped like an upstream pull request (no xarif files). Not a branch: a branch push would run the upstream's own workflows on our runner. A `patch/*` branch is refused and never used |
 | `sync/next` | the next candidate, written by the bot `fork-bot` |
 | `v<upstream>-xarif.<n>` | a fork release, for example `v0.16.6-xarif.1` |
 
@@ -41,14 +41,16 @@ If something needs a human, `fork-bot` opens an issue labelled `fork-blocked` (t
 stopped) or `fork-advisory` (a security advisory; the sync continues). Each issue says
 what happened and what to do. Unlike upstream's CI, a cargo-deny advisory does not fail
 the check here: it is reported, and fixed with a topic (e.g. `rustls-update`) or by
-the next upstream release. A `fork-blocked` issue closes itself once the cause is gone;
-close a `fork-advisory` issue by hand once decided.
+the next upstream release. Both kinds close themselves once the cause is gone. Closing a
+`fork-advisory` issue by hand while the advisory stands only lasts until the next sync pull
+request: its check opens a new one.
 
 ## Change a patch topic
 
-Push to `patch/<topic>`; the next `fork-sync` picks it up (or start it by hand:
-Actions → fork-sync → Run workflow). To send a topic upstream or take the
-maintainer's fixups back, use [`.xarif/pr.sh`](.xarif/pr.sh) (`push` / `pull`).
+[`.xarif/pr.sh`](.xarif/pr.sh) `get <topic>` checks the topic out as the local branch
+`patch/<topic>`; commit, then `save <topic>` stores it. The next `fork-sync` picks it up (or
+start it by hand: Actions → fork-sync → Run workflow). `push` / `pull` send a topic upstream
+as a pull request and take the maintainer's fixups back (shown for review first).
 
 ## Database migrations
 

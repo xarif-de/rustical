@@ -1,20 +1,56 @@
 #!/usr/bin/env bash
-# Upstream PRs for patch topics (XARIF.md "Change a patch topic"). Run in a checkout of the fork,
-# by a human with push rights on the user fork. Topics and PR branches: .xarif/series.
-#   .xarif/pr.sh pull <topic>   take maintainer fixups from the PR head into patch/<topic> (fast-forward only)
-#   .xarif/pr.sh push <topic>   publish patch/<topic> as the PR head (refuses to drop commits the PR head has)
+# Patch topics and their upstream PRs (XARIF.md "Change a patch topic"). Run in a checkout of the fork.
+# A topic lives in refs/xarif/patch/<topic> on Forgejo, not in a branch: a branch push would run the
+# upstream's own .github/workflows on our runner (base/dagger-modules docs/fork.md). Locally it is the
+# branch patch/<topic>.
+#   .xarif/pr.sh list           the topics on Forgejo
+#   .xarif/pr.sh get <topic>    check out the topic as the local branch patch/<topic>
+#   .xarif/pr.sh save <topic>   store the local branch patch/<topic> as the topic (refuses to drop
+#                               commits stored since your get; a rebase needs FORCE=1)
+#   .xarif/pr.sh pull <topic>   take maintainer fixups from the PR head into the topic (fast-forward only)
+#   .xarif/pr.sh push <topic>   publish the topic as the PR head (refuses to drop commits the PR head has)
 set -euo pipefail
 USER_FORK=${USER_FORK:-https://github.com/ThomasSteinbach/rustical}
 UPSTREAM=${UPSTREAM:-lennart-k/rustical}
 FORGEJO=${FORGEJO:-https://git.xarif.de/docker/rustical.git}
-cmd=${1:?pull|push}; topic=${2:?topic}
+cmd=${1:?list|get|save|pull|push}
+if [ "$cmd" = list ]; then git ls-remote "$FORGEJO" 'refs/xarif/patch/*' | sed 's#refs/xarif/patch/##'; exit 0; fi
+topic=${2:?topic}
+[[ $topic =~ ^[a-z0-9][a-z0-9-]*$ ]] || { echo "bad topic name $topic" >&2; exit 2; }
+ours=refs/xarif-seen/patch/$topic # private: a plain `git fetch origin` (and its prune) never touches it
+fetch_topic() { # the stored topic → $ours (absent: removed)
+  git update-ref -d "$ours" 2>/dev/null || true
+  git fetch -q "$FORGEJO" "+refs/xarif/patch/$topic:$ours" 2>/dev/null || true
+}
+case "$cmd" in
+  get)
+    fetch_topic
+    git rev-parse -q --verify "$ours" >/dev/null || { echo "no topic $topic on Forgejo" >&2; exit 1; }
+    if git rev-parse -q --verify "refs/heads/patch/$topic" >/dev/null && ! git merge-base --is-ancestor "patch/$topic" "$ours"; then
+      echo "local patch/$topic has commits the stored topic lacks: save them, or delete the branch" >&2; exit 1
+    fi
+    git switch -q -C "patch/$topic" "$ours"
+    echo "on patch/$topic; commit, then: $0 save $topic"; exit 0 ;;
+  save)
+    git rev-parse -q --verify "refs/heads/patch/$topic" >/dev/null || { echo "no local branch patch/$topic" >&2; exit 1; }
+    seen=$(git rev-parse -q --verify "$ours" || true) # what your last get/save saw
+    if [ -n "$seen" ] && ! git merge-base --is-ancestor "$seen" "patch/$topic" && [ -z "${FORCE:-}" ]; then
+      echo "patch/$topic does not contain the stored topic (a rebase?): FORCE=1 $0 save $topic" >&2; exit 1
+    fi
+    git push --force-with-lease="refs/xarif/patch/$topic:$seen" "$FORGEJO" "patch/$topic:refs/xarif/patch/$topic"
+    fetch_topic
+    echo "topic $topic stored; the next fork-sync picks it up (a new topic also needs its series line, by PR)"; exit 0 ;;
+  pull|push) ;;
+  *) echo "usage: $0 list|get|save|pull|push <topic>" >&2; exit 2 ;;
+esac
 # the series as it is NOW (not a stale local remote-tracking ref)
 git fetch -q "$FORGEJO" "+refs/heads/xarif:refs/remotes/origin/xarif"
 line=$(git show origin/xarif:.xarif/series | awk -v t="$topic" '$1==t')
 [ -n "$line" ] || { echo "topic $topic is not in the series" >&2; exit 1; }
 pr=$(sed -n 's/.* pr=\([^ ]*\).*/\1/p' <<<"$line")
 [ "$pr" != local ] || { echo "topic $topic is local (no upstream PR)" >&2; exit 1; }
-git fetch -q "$FORGEJO" "+refs/heads/patch/$topic:refs/remotes/origin/patch/$topic"
+fetch_topic
+git rev-parse -q --verify "$ours" >/dev/null || { echo "no topic $topic on Forgejo" >&2; exit 1; }
 # the PR head, if the branch exists yet (exit 2 = no such branch; anything else is a real error)
 if git ls-remote --exit-code "$USER_FORK" "refs/heads/$pr" >/dev/null; then
   git fetch -q "$USER_FORK" "+refs/heads/$pr:refs/pr-head/$topic"
@@ -22,21 +58,24 @@ else
   rc=$?; [ "$rc" = 2 ] || { echo "cannot read $USER_FORK (exit $rc)" >&2; exit 1; }
   git update-ref -d "refs/pr-head/$topic" 2>/dev/null || true
 fi
-ours=refs/remotes/origin/patch/$topic theirs=refs/pr-head/$topic
+theirs=refs/pr-head/$topic
 case "$cmd" in
   pull)
     git rev-parse -q --verify "$theirs" >/dev/null || { echo "no PR head $USER_FORK $pr" >&2; exit 1; }
-    if git merge-base --is-ancestor "$theirs" "$ours"; then echo "patch/$topic already contains the PR head"; exit 0; fi
-    git merge-base --is-ancestor "$ours" "$theirs" || { echo "PR head and patch/$topic diverged: rebase by hand" >&2; exit 1; }
-    git push "$FORGEJO" "$theirs:refs/heads/patch/$topic"
-    echo "patch/$topic fast-forwarded to the PR head; the next fork-sync picks it up" ;;
+    if git merge-base --is-ancestor "$theirs" "$ours"; then echo "topic $topic already contains the PR head"; exit 0; fi
+    git merge-base --is-ancestor "$ours" "$theirs" || { echo "PR head and topic $topic diverged: rebase by hand" >&2; exit 1; }
+    # the maintainer's commits are code we did not write: read them before they reach the fork
+    git log --stat "$ours..$theirs"
+    read -r -p "store these commits as topic $topic? [y/N] " ok
+    [ "$ok" = y ] || { echo "nothing stored"; exit 1; }
+    git push --force-with-lease="refs/xarif/patch/$topic:$(git rev-parse "$ours")" "$FORGEJO" "$theirs:refs/xarif/patch/$topic"
+    echo "topic $topic fast-forwarded to the PR head; the next fork-sync picks it up" ;;
   push)
     seen=$(git rev-parse -q --verify "$theirs" || true)
     if [ -n "$seen" ] && ! git merge-base --is-ancestor "$seen" "$ours"; then
-      echo "the PR head has commits patch/$topic lacks (maintainer fixups?): run '$0 pull $topic' first" >&2; exit 1
+      echo "the PR head has commits topic $topic lacks (maintainer fixups?): run '$0 pull $topic' first" >&2; exit 1
     fi
     git push --force-with-lease="refs/heads/$pr:$seen" "$USER_FORK" "$ours:refs/heads/$pr"
     owner=$(sed -E 's#^(https://github\.com/|git@github\.com:|ssh://git@github\.com/)##; s#/.*##' <<<"$USER_FORK")
     [ -n "$seen" ] || echo "open the PR: gh pr create -R $UPSTREAM --head $owner:$pr --base main --fill" ;;
-  *) echo "usage: $0 pull|push <topic>" >&2; exit 2 ;;
 esac
