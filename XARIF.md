@@ -39,7 +39,10 @@ it again.
 
 If something needs a human, `fork-bot` opens an issue labelled `fork-blocked` (the sync
 stopped) or `fork-advisory` (a security advisory; the sync continues). Each issue says
-what happened and what to do.
+what happened and what to do. Unlike upstream's CI, a cargo-deny advisory does not fail
+the check here: it is reported, and fixed with a topic (e.g. `rustls-0.23.46`) or by
+the next upstream release. A `fork-blocked` issue closes itself once the cause is gone;
+close a `fork-advisory` issue by hand once decided.
 
 ## Change a patch topic
 
@@ -53,6 +56,10 @@ RustiCal checks the checksum of every migration it has applied and refuses to st
 one changed or disappeared. A fork migration must therefore stay byte-identical, and
 there is **no rollback** to an older release once a newer one migrated the database:
 fix forward. `fork-sync` stops if upstream takes a migration in a different form.
+
+Every program that opens the database must come from the same fork release, and
+`rustical serve` must have run its migrations before anything else reads the new columns
+(PractiCal waits for RustiCal's `/ping` for this reason).
 
 ## Automation details
 
