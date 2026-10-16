@@ -47,8 +47,11 @@ request: its check opens a new one.
 
 ## Change a patch topic
 
-[`.xarif/pr.sh`](.xarif/pr.sh) `get <topic>` checks the topic out as the local branch
-`patch/<topic>`; commit, then `save <topic>` stores it. The next `fork-sync` picks it up (or
+[`.xarif/pr.sh`](.xarif/pr.sh) (from `base/dagger-modules` `templates/fork/`, values in
+[`.xarif/pr.env`](.xarif/pr.env)) `get <topic>` checks the topic out as the local branch
+`patch/<topic>`; commit, then `save <topic>` stores it. A checked-out topic is upstream code without
+`.xarif/`: run the script once from `xarif`, it copies itself to `.git/xarif-pr.sh`, and use that copy
+while a topic is checked out (it prints the path). The next `fork-sync` picks it up (or
 start it by hand: Actions → fork-sync → Run workflow). `push` / `pull` send a topic upstream
 as a pull request and take the maintainer's fixups back (shown for review first).
 
