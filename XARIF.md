@@ -40,7 +40,7 @@ it again.
 If something needs a human, `fork-bot` opens an issue labelled `fork-blocked` (the sync
 stopped) or `fork-advisory` (a security advisory; the sync continues). Each issue says
 what happened and what to do. Unlike upstream's CI, a cargo-deny advisory does not fail
-the check here: it is reported, and fixed with a topic (e.g. `rustls-0.23.46`) or by
+the check here: it is reported, and fixed with a topic (e.g. `rustls-update`) or by
 the next upstream release. A `fork-blocked` issue closes itself once the cause is gone;
 close a `fork-advisory` issue by hand once decided.
 
