@@ -1,0 +1,18 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": ["local>infra/renovate-config"],
+    // Fork of lennart-k/rustical (XARIF.md): Renovate maintains ONLY our infra files.
+    // Upstream files follow upstream releases through fork-sync; a Renovate PR on them
+    // would be rejected by fork-check (non-sync PRs may only change infra paths).
+    "enabledManagers": ["github-actions", "custom.regex"],
+    "ignorePaths": [".github/**", "Dockerfile*", "Cargo.*", "crates/**", "src/**", "flake.*", "docs/**", "tests/**", "supply-chain/**"],
+    "customManagers": [
+        {
+            "customType": "regex",
+            "description": "cargo tools of the replayed upstream suite (dagger-ci.yaml fork.suite.tools)",
+            "managerFilePatterns": ["/^dagger-ci\\.yaml$/"],
+            "matchStrings": ["(?<depName>cargo-[a-z-]+)@(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+            "datasourceTemplate": "crate"
+        }
+    ]
+}
