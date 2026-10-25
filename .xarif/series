@@ -1,0 +1,6 @@
+# Patch topics in stacking order: <topic> base=<upstream sha> pr=<user-fork branch>|local [guard=<table>.<column>,…]
+# Each topic is the ref refs/xarif/patch/<topic> (.xarif/pr.sh get/save); fork-sync rebases them onto the target release in this order.
+oidc-auto-redirect base=15ab8024368010677d6169ca18af968b9d03ea1c pr=feat/oidc-auto-redirect
+app-token-last-used base=87bc050cb1a3b38d6165101267ea5b1951271202 pr=feat/app-token-last-used guard=app_tokens.last_used
+frontend-source-link base=87bc050cb1a3b38d6165101267ea5b1951271202 pr=local
+security-updates base=b57b043491dd7dac25077d7861189089605e1159 pr=local
