@@ -3,4 +3,3 @@
 oidc-auto-redirect base=15ab8024368010677d6169ca18af968b9d03ea1c pr=feat/oidc-auto-redirect
 app-token-last-used base=87bc050cb1a3b38d6165101267ea5b1951271202 pr=feat/app-token-last-used guard=app_tokens.last_used
 frontend-source-link base=87bc050cb1a3b38d6165101267ea5b1951271202 pr=local
-rustls-update base=87bc050cb1a3b38d6165101267ea5b1951271202 pr=local
