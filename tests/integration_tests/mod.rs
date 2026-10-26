@@ -106,5 +106,6 @@ async fn test_ping(
     assert!(response.status().is_success());
 }
 
+mod access;
 mod caldav;
 mod carddav;
