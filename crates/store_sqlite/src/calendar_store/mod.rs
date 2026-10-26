@@ -1,5 +1,6 @@
 use super::ChangeOperation;
 use crate::BEGIN_IMMEDIATE;
+use crate::share_store::calendar_name_shared;
 use async_trait::async_trait;
 use caldata::parser::ParserError;
 use caldata::types::CalDateTime;
@@ -900,7 +901,18 @@ impl CalendarReadStore for SqliteCalendarStore {
 impl CalendarWriteStore for SqliteCalendarStore {
     #[instrument]
     async fn insert_calendar(&self, calendar: Calendar) -> Result<(), Error> {
-        Self::insert_calendar_impl(&self.db, calendar).await
+        let mut tx = self
+            .db
+            .begin_with(BEGIN_IMMEDIATE)
+            .await
+            .map_err(crate::Error::from)?;
+        // The name may not be taken by a calendar shared with this principal
+        if calendar_name_shared(&mut tx, &calendar.principal, &calendar.id).await? {
+            return Err(Error::AlreadyExists);
+        }
+        Self::insert_calendar_impl(&mut *tx, calendar).await?;
+        tx.commit().await.map_err(crate::Error::from)?;
+        Ok(())
     }
 
     #[instrument]
@@ -976,6 +988,9 @@ impl CalendarWriteStore for SqliteCalendarStore {
             return Err(Error::AlreadyExists);
         }
         if existing_cal.is_none() {
+            if calendar_name_shared(&mut tx, &calendar.principal, &calendar.id).await? {
+                return Err(Error::AlreadyExists);
+            }
             Self::insert_calendar_impl(&mut *tx, calendar.clone()).await?;
         }
 
