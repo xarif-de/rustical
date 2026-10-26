@@ -11,7 +11,7 @@ use anyhow::anyhow;
 use argon2::password_hash::{PasswordHasher, SaltString, rand_core::OsRng};
 use clap::{Parser, Subcommand};
 use rustical_store::{
-    Secret,
+    Secret, ShareStore,
     auth::{AuthenticationProvider, Principal, PrincipalType},
 };
 
@@ -83,6 +83,13 @@ pub struct EditArgs {
     pub name: Option<String>,
     #[arg(value_enum, short, long, help = "Change the principal type")]
     pub principal_type: Option<PrincipalType>,
+    #[arg(
+        long,
+        help = "Set the e-mail address (others can share with this address)"
+    )]
+    pub email: Option<String>,
+    #[arg(long, help = "Remove the e-mail address", conflicts_with = "email")]
+    pub remove_email: bool,
 }
 
 #[derive(Debug, Subcommand)]
@@ -101,7 +108,8 @@ pub enum PrincipalsCommand {
     clippy::too_many_lines
 )]
 pub async fn cmd_principals(args: PrincipalsArgs, config: Config) -> anyhow::Result<()> {
-    let (_, _, _, principal_store, _) = get_data_stores(true, &config.data_store).await?;
+    let (_, _, _, principal_store, share_store, _) =
+        get_data_stores(true, &config.data_store).await?;
     match args.command {
         PrincipalsCommand::List => {
             for principal in principal_store.get_principals().await? {
@@ -163,6 +171,8 @@ pub async fn cmd_principals(args: PrincipalsArgs, config: Config) -> anyhow::Res
             name,
             principal_type,
             for_testing_password_from_arg,
+            email,
+            remove_email,
         }) => {
             let mut principal = principal_store
                 .get_principal(&id)
@@ -200,6 +210,11 @@ pub async fn cmd_principals(args: PrincipalsArgs, config: Config) -> anyhow::Res
                 principal.principal_type = principal_type;
             }
             principal_store.insert_principal(principal, true).await?;
+            if email.is_some() || remove_email {
+                share_store
+                    .set_principal_email(&id, email.as_deref())
+                    .await?;
+            }
             println!("Principal {id} updated");
         }
         PrincipalsCommand::Membership(args) => {
