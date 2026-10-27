@@ -66,6 +66,18 @@ Every program that opens the database must come from the same fork release, and
 `rustical serve` must have run its migrations before anything else reads the new columns
 (PractiCal waits for RustiCal's `/ping` for this reason).
 
+## The sharing topic
+
+`sharing` (pr=local, since v0.16.7-xarif.3) lets a principal share calendars and address books with
+another principal or a group, to read or to write, with per-owner levels for CLASS:PRIVATE and
+CLASS:CONFIDENTIAL (CLI `rustical share …`, frontend pages, CalDAV/CardDAV copies in the sharee's home).
+It adds the migration `20261027120000_sharing` (tables `calendar_shares`, `addressbook_shares`,
+`principal_visibility`, `principal_emails`), so it stays in the series until upstream takes sharing in a
+compatible form: dropping it would leave applied migrations behind. Its guard (see `.xarif/series`) stops a
+sync on any upstream migration that names these tables, the names a table rebuild would use, or RENAME.
+The topic touches the DAV crates that upstream changes most: expect a rebase by hand for many upstream
+releases, and every conflict blocks all fork releases until it is resolved.
+
 ## Automation details
 
 `dagger-ci.yaml` (`fork:` section) and the functions in
