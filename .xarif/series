@@ -4,4 +4,4 @@ oidc-auto-redirect base=15ab8024368010677d6169ca18af968b9d03ea1c pr=feat/oidc-au
 app-token-last-used base=87bc050cb1a3b38d6165101267ea5b1951271202 pr=feat/app-token-last-used guard=app_tokens.last_used
 frontend-source-link base=87bc050cb1a3b38d6165101267ea5b1951271202 pr=local
 security-updates base=b57b043491dd7dac25077d7861189089605e1159 pr=local
-sharing base=b57b043491dd7dac25077d7861189089605e1159 pr=local guard=calendar_shares.calendar_shares,addressbook_shares.addressbook_shares,principal_emails.principal_emails,principal_visibility.principal_visibility,x.calendar_views,x.addressbook_views,x.new_calendars,x.new_addressbooks,x.new_principals,x.calendars_old,x.addressbooks_old,x.principals_old,x.rename
+sharing base=b57b043491dd7dac25077d7861189089605e1159 pr=local guard=calendar_shares.calendar_shares,addressbook_shares.addressbook_shares,principal_emails.principal_emails,principal_visibility.principal_visibility,calendar_visibility.calendar_visibility,x.calendar_views,x.addressbook_views,x.new_calendars,x.new_addressbooks,x.new_principals,x.calendars_old,x.addressbooks_old,x.principals_old,x.rename
