@@ -165,6 +165,16 @@ pub trait ShareStore: std::fmt::Debug + Send + Sync + 'static {
         created_by: Option<&str>,
     ) -> Result<CalendarShare, Error>;
     async fn unshare_calendar(&self, owner: &str, cal_id: &str, sharee: &str) -> Result<(), Error>;
+    /// Changes the access of the existing share of `(owner, cal_id)` with the principal
+    /// `sharee`. Never creates a share: [`Error::NotFound`] if there is none (for example
+    /// because the sharee ended it).
+    async fn set_calendar_share_access(
+        &self,
+        owner: &str,
+        cal_id: &str,
+        sharee: &str,
+        access: Access,
+    ) -> Result<(), Error>;
     async fn list_calendar_shares(
         &self,
         owner: &str,
@@ -201,6 +211,14 @@ pub trait ShareStore: std::fmt::Debug + Send + Sync + 'static {
         addressbook_id: &str,
         sharee: &str,
     ) -> Result<(), Error>;
+    /// [`Self::set_calendar_share_access`] for addressbooks
+    async fn set_addressbook_share_access(
+        &self,
+        owner: &str,
+        addressbook_id: &str,
+        sharee: &str,
+        access: Access,
+    ) -> Result<(), Error>;
     async fn list_addressbook_shares(
         &self,
         owner: &str,
@@ -232,29 +250,34 @@ pub trait ShareStore: std::fmt::Debug + Send + Sync + 'static {
     /// How objects of the calendar `(owner, cal_id)` with CLASS:PRIVATE/CONFIDENTIAL appear in
     /// its shares
     async fn get_visibility(&self, owner: &str, cal_id: &str) -> Result<Policy, Error>;
-    /// Changes the calendar's policy; if it is shared, every object whose view depends on it
-    /// is logged as changed, so sharees pick the new views up with their next sync.
+    /// Changes the calendar's policy. Every live object whose level differs between the old and
+    /// the new policy is logged as changed, whether the calendar is shared now or not, so sharees
+    /// pick the new views up with their next sync; an unchanged policy changes nothing.
     /// [`Error::NotFound`] for no live calendar.
     async fn set_visibility(&self, owner: &str, cal_id: &str, policy: Policy) -> Result<(), Error>;
 
-    /// Writes an object of `(owner, cal_id)` for a sharee with write access, in one transaction:
-    /// only a fully visible, live object can be replaced (its UID unchanged, its alarms kept);
-    /// a new object needs a name and a UID unused in the calendar, also in the trash bin.
-    /// The conditions are checked against the sharee's view. Returns the `ETag` of that view
-    /// if what is stored is what was sent.
+    /// Writes an object of `(owner, cal_id)` for `sharee`, in one transaction that first checks
+    /// that the share still exists ([`Error::NotFound`]) with write access
+    /// ([`Error::Forbidden`]): only a fully visible, live object can be replaced (its UID
+    /// unchanged, its alarms kept); a new object needs a name and a UID unused in the calendar,
+    /// also in the trash bin. The conditions are checked against the sharee's view. Returns the
+    /// `ETag` of that view if what is stored is what was sent.
     async fn put_copy_object(
         &self,
         owner: &str,
         cal_id: &str,
+        sharee: &str,
         object_id: &str,
         object: CalendarObject,
         preconditions: Preconditions<'_>,
     ) -> Result<Option<String>, Error>;
-    /// Moves a fully visible object of `(owner, cal_id)` to the trash bin for a sharee
+    /// Moves a fully visible object of `(owner, cal_id)` to the trash bin for `sharee`, with the
+    /// checks of [`Self::put_copy_object`] in the same transaction
     async fn delete_copy_object(
         &self,
         owner: &str,
         cal_id: &str,
+        sharee: &str,
         object_id: &str,
         preconditions: Preconditions<'_>,
     ) -> Result<(), Error>;
@@ -263,6 +286,7 @@ pub trait ShareStore: std::fmt::Debug + Send + Sync + 'static {
         &self,
         owner: &str,
         addressbook_id: &str,
+        sharee: &str,
         object_id: &str,
         object: AddressObject,
         preconditions: Preconditions<'_>,
@@ -272,6 +296,7 @@ pub trait ShareStore: std::fmt::Debug + Send + Sync + 'static {
         &self,
         owner: &str,
         addressbook_id: &str,
+        sharee: &str,
         object_id: &str,
         preconditions: Preconditions<'_>,
     ) -> Result<(), Error>;

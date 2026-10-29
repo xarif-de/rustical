@@ -2,7 +2,7 @@ use crate::calendar_store::ObjectColumns;
 use crate::{BEGIN_IMMEDIATE, ChangeOperation, SqliteAddressbookStore, SqliteCalendarStore};
 use async_trait::async_trait;
 use derive_more::Constructor;
-use rustical_ical::visibility::{self, FULL, HIDDEN, Policy};
+use rustical_ical::visibility::{self, Classes, FULL, HIDDEN, Policy};
 use rustical_ical::{AddressObject, CalendarObject};
 use rustical_store::{
     Access, AddressbookShare, CalendarShare, CollectionOperation, CollectionOperationInfo,
@@ -415,6 +415,31 @@ impl ShareStore for SqliteShareStore {
     }
 
     #[instrument]
+    async fn set_calendar_share_access(
+        &self,
+        owner: &str,
+        cal_id: &str,
+        sharee: &str,
+        access: Access,
+    ) -> Result<(), Error> {
+        let access = access.as_str();
+        let result = sqlx::query!(
+            r#"UPDATE calendar_shares SET access = ? WHERE (owner, cal_id, sharee) = (?, ?, ?)"#,
+            access,
+            owner,
+            cal_id,
+            sharee
+        )
+        .execute(&self.db)
+        .await
+        .map_err(crate::Error::from)?;
+        if result.rows_affected() == 0 {
+            return Err(Error::NotFound);
+        }
+        Ok(())
+    }
+
+    #[instrument]
     async fn list_calendar_shares(
         &self,
         owner: &str,
@@ -629,6 +654,31 @@ impl ShareStore for SqliteShareStore {
     }
 
     #[instrument]
+    async fn set_addressbook_share_access(
+        &self,
+        owner: &str,
+        addressbook_id: &str,
+        sharee: &str,
+        access: Access,
+    ) -> Result<(), Error> {
+        let access = access.as_str();
+        let result = sqlx::query!(
+            r#"UPDATE addressbook_shares SET access = ? WHERE (owner, addressbook_id, sharee) = (?, ?, ?)"#,
+            access,
+            owner,
+            addressbook_id,
+            sharee
+        )
+        .execute(&self.db)
+        .await
+        .map_err(crate::Error::from)?;
+        if result.rows_affected() == 0 {
+            return Err(Error::NotFound);
+        }
+        Ok(())
+    }
+
+    #[instrument]
     async fn list_addressbook_shares(
         &self,
         owner: &str,
@@ -790,6 +840,10 @@ impl ShareStore for SqliteShareStore {
         .await
         .map_err(crate::Error::from)?
         .ok_or(Error::NotFound)?;
+        let old = Self::_get_visibility(&mut tx, owner, cal_id).await?;
+        if old == policy {
+            return Ok(());
+        }
         sqlx::query!(
             r#"INSERT INTO calendar_visibility (principal, cal_id, private, confidential) VALUES (?, ?, ?, ?)
                 ON CONFLICT(principal, cal_id) DO UPDATE SET (private, confidential) = (excluded.private, excluded.confidential)"#,
@@ -802,43 +856,40 @@ impl ShareStore for SqliteShareStore {
         .await
         .map_err(crate::Error::from)?;
 
-        // Sharees pick the new views up with their next sync
-        let shared = sqlx::query!(
-            r#"SELECT 1 AS "one: i64" FROM calendar_shares WHERE (owner, cal_id) = (?, ?) LIMIT 1"#,
+        // Every object whose view changes is logged, shared now or not: a share ended and
+        // created again has the same name, and its sharee may sync with a token from before.
+        // Only objects with a CLASS other than PUBLIC are parsed, the text test is cheap.
+        let objects = sqlx::query!(
+            r#"SELECT id, ics FROM calendarobjects
+                WHERE (principal, cal_id) = (?, ?) AND deleted_at IS NULL"#,
             owner,
             cal_id
         )
-        .fetch_optional(&mut *tx)
+        .fetch_all(&mut *tx)
         .await
-        .map_err(crate::Error::from)?
-        .is_some();
-        let mut sync_token = None;
-        if shared {
-            let objects = sqlx::query!(
-                r#"SELECT id, ics FROM calendarobjects
-                    WHERE (principal, cal_id) = (?, ?) AND deleted_at IS NULL"#,
-                owner,
-                cal_id
-            )
-            .fetch_all(&mut *tx)
-            .await
-            .map_err(crate::Error::from)?;
-            for object in objects {
-                let depends = CalendarObject::from_ics(object.ics)
-                    .map_or(true, |parsed| visibility::depends_on_policy(&parsed));
-                if depends {
-                    sync_token = Some(
-                        SqliteCalendarStore::log_object_operation(
-                            &mut tx,
-                            owner,
-                            cal_id,
-                            &object.id,
-                            ChangeOperation::Add,
-                        )
-                        .await?,
-                    );
+        .map_err(crate::Error::from)?;
+        let changed: Vec<String> = objects
+            .into_iter()
+            .filter(|object| {
+                visibility::may_depend_on_policy(&object.ics) && {
+                    let classes = Classes::of(&object.ics);
+                    classes.level(old) != classes.level(policy)
                 }
-            }
+            })
+            .map(|object| object.id)
+            .collect();
+        let mut sync_token = None;
+        for object_id in &changed {
+            sync_token = Some(
+                SqliteCalendarStore::log_object_operation(
+                    &mut tx,
+                    owner,
+                    cal_id,
+                    object_id,
+                    ChangeOperation::Add,
+                )
+                .await?,
+            );
         }
         tx.commit().await.map_err(crate::Error::from)?;
         if let Some(sync_token) = sync_token {
@@ -852,6 +903,7 @@ impl ShareStore for SqliteShareStore {
         &self,
         owner: &str,
         cal_id: &str,
+        sharee: &str,
         object_id: &str,
         object: CalendarObject,
         preconditions: Preconditions<'_>,
@@ -861,6 +913,7 @@ impl ShareStore for SqliteShareStore {
             .begin_with(BEGIN_IMMEDIATE)
             .await
             .map_err(crate::Error::from)?;
+        Self::check_calendar_write(&mut tx, owner, cal_id, sharee).await?;
         let topic = Self::writable_calendar(&mut tx, owner, cal_id).await?;
         let policy = Self::_get_visibility(&mut tx, owner, cal_id).await?;
         let row = sqlx::query!(
@@ -985,6 +1038,7 @@ impl ShareStore for SqliteShareStore {
         &self,
         owner: &str,
         cal_id: &str,
+        sharee: &str,
         object_id: &str,
         preconditions: Preconditions<'_>,
     ) -> Result<(), Error> {
@@ -993,6 +1047,7 @@ impl ShareStore for SqliteShareStore {
             .begin_with(BEGIN_IMMEDIATE)
             .await
             .map_err(crate::Error::from)?;
+        Self::check_calendar_write(&mut tx, owner, cal_id, sharee).await?;
         let topic = Self::writable_calendar(&mut tx, owner, cal_id).await?;
         let policy = Self::_get_visibility(&mut tx, owner, cal_id).await?;
         let ics = sqlx::query_scalar!(
@@ -1043,6 +1098,7 @@ impl ShareStore for SqliteShareStore {
         &self,
         owner: &str,
         addressbook_id: &str,
+        sharee: &str,
         object_id: &str,
         object: AddressObject,
         preconditions: Preconditions<'_>,
@@ -1052,6 +1108,7 @@ impl ShareStore for SqliteShareStore {
             .begin_with(BEGIN_IMMEDIATE)
             .await
             .map_err(crate::Error::from)?;
+        Self::check_addressbook_write(&mut tx, owner, addressbook_id, sharee).await?;
         let topic = Self::live_addressbook(&mut tx, owner, addressbook_id).await?;
         let row = sqlx::query!(
             r#"SELECT vcf, deleted_at IS NOT NULL AS "deleted!: bool" FROM addressobjects
@@ -1119,6 +1176,7 @@ impl ShareStore for SqliteShareStore {
         &self,
         owner: &str,
         addressbook_id: &str,
+        sharee: &str,
         object_id: &str,
         preconditions: Preconditions<'_>,
     ) -> Result<(), Error> {
@@ -1127,6 +1185,7 @@ impl ShareStore for SqliteShareStore {
             .begin_with(BEGIN_IMMEDIATE)
             .await
             .map_err(crate::Error::from)?;
+        Self::check_addressbook_write(&mut tx, owner, addressbook_id, sharee).await?;
         let topic = Self::live_addressbook(&mut tx, owner, addressbook_id).await?;
         let vcf = sqlx::query_scalar!(
             r#"SELECT vcf FROM addressobjects
@@ -1195,6 +1254,53 @@ impl SqliteShareStore {
         Ok(row
             .and_then(|row| Policy::new(row.private, row.confidential))
             .unwrap_or_default())
+    }
+
+    /// That `sharee` still has write access to the calendar, checked in the transaction of the
+    /// write: [`Error::NotFound`] if the share is gone, [`Error::Forbidden`] if it only reads
+    async fn check_calendar_write(
+        tx: &mut Transaction<'_, Sqlite>,
+        owner: &str,
+        cal_id: &str,
+        sharee: &str,
+    ) -> Result<(), Error> {
+        let access = sqlx::query_scalar!(
+            r#"SELECT access FROM calendar_shares WHERE (owner, cal_id, sharee) = (?, ?, ?)"#,
+            owner,
+            cal_id,
+            sharee
+        )
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(crate::Error::from)?
+        .ok_or(Error::NotFound)?;
+        match access.parse()? {
+            Access::Write => Ok(()),
+            Access::Read => Err(Error::Forbidden),
+        }
+    }
+
+    /// See [`Self::check_calendar_write`]
+    async fn check_addressbook_write(
+        tx: &mut Transaction<'_, Sqlite>,
+        owner: &str,
+        addressbook_id: &str,
+        sharee: &str,
+    ) -> Result<(), Error> {
+        let access = sqlx::query_scalar!(
+            r#"SELECT access FROM addressbook_shares WHERE (owner, addressbook_id, sharee) = (?, ?, ?)"#,
+            owner,
+            addressbook_id,
+            sharee
+        )
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(crate::Error::from)?
+        .ok_or(Error::NotFound)?;
+        match access.parse()? {
+            Access::Write => Ok(()),
+            Access::Read => Err(Error::Forbidden),
+        }
     }
 
     /// The push topic of a live calendar that takes objects
