@@ -1,0 +1,8 @@
+# Upstream image is FROM scratch (no shell): inspect-only (base/dagger-modules docs/docker-testing.md).
+tests:
+  - name: image-metadata
+    inspect:
+      expose: [4000]
+      max_size: 80MiB
+      labels:
+        org.opencontainers.image.licenses: AGPL-3.0-or-later
