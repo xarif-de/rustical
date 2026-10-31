@@ -5,3 +5,4 @@ app-token-last-used base=87bc050cb1a3b38d6165101267ea5b1951271202 pr=feat/app-to
 frontend-source-link base=87bc050cb1a3b38d6165101267ea5b1951271202 pr=local
 security-updates base=b57b043491dd7dac25077d7861189089605e1159 pr=local
 sharing base=b57b043491dd7dac25077d7861189089605e1159 pr=local guard=calendar_shares.calendar_shares,addressbook_shares.addressbook_shares,principal_emails.principal_emails,principal_visibility.principal_visibility,calendar_visibility.calendar_visibility,x.calendar_views,x.addressbook_views,x.new_calendars,x.new_addressbooks,x.new_principals,x.calendars_old,x.addressbooks_old,x.principals_old,x.rename
+ci-package-mirror base=b57b043491dd7dac25077d7861189089605e1159 pr=local
