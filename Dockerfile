@@ -2,6 +2,15 @@ FROM --platform=$BUILDPLATFORM rust:1.98-alpine AS chef
 
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
+# xarif CI passes the artifact cache's Alpine and crates mirrors; unset, apk and
+# cargo use their origins. The final image is scratch: none of this ships.
+ARG XARIF_APK_MIRROR
+ARG XARIF_CARGO_REGISTRY
+RUN if [ -n "${XARIF_APK_MIRROR:-}" ]; then \
+      sed -i "s#https*://dl-cdn.alpinelinux.org/alpine#$XARIF_APK_MIRROR#" /etc/apk/repositories; fi \
+ && if [ -n "${XARIF_CARGO_REGISTRY:-}" ]; then mkdir -p "$CARGO_HOME" && \
+      printf '[source.crates-io]\nreplace-with = "xarif"\n[source.xarif]\nregistry = "%s"\n' \
+        "$XARIF_CARGO_REGISTRY" >> "$CARGO_HOME/config.toml"; fi
 
 # the compiler will otherwise ask for aarch64-linux-musl-gcc
 ENV CC_aarch64_unknown_linux_musl="clang"
