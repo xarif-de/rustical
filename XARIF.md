@@ -68,12 +68,12 @@ Every program that opens the database must come from the same fork release, and
 
 ## The sharing topic
 
-`sharing` (pr=local, since v0.16.7-xarif.3) lets a principal share calendars and address books with
+`sharing` (since v0.16.7-xarif.3; offered upstream as lennart-k/rustical#287, pr=feat/sharing) lets a principal share calendars and address books with
 another principal or a group, to read or to write, with per-calendar levels for CLASS:PRIVATE and
 CLASS:CONFIDENTIAL, hidden unless set (CLI `rustical share …`, frontend pages, CalDAV/CardDAV copies in the
 sharee's home). It adds the migrations `20261027120000_sharing` (tables `calendar_shares`,
 `addressbook_shares`, `principal_visibility`, `principal_emails`) and `20261028120000_calendar_visibility`
-(`calendar_visibility`, replacing `principal_visibility`), so it stays in the series until upstream takes sharing in a
+(`calendar_visibility`, replacing `principal_visibility`), so it stays in the series until upstream takes sharing (#287 or another way) in a
 compatible form: dropping it would leave applied migrations behind. Its guard (see `.xarif/series`) stops a
 sync on any upstream migration that names these tables, the names a table rebuild would use, or RENAME.
 The topic touches the DAV crates that upstream changes most: expect a rebase by hand for many upstream
