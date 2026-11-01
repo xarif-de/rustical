@@ -2,7 +2,6 @@ use super::methods::{get_object, put_object};
 use crate::{CardDavPrincipalUri, Error, address_object::resource::AddressObjectResource};
 use async_trait::async_trait;
 use axum::{extract::Request, handler::Handler, response::Response};
-use derive_more::derive::Constructor;
 use futures_util::future::BoxFuture;
 use rustical_dav::resource::{AxumMethods, ResourceService};
 use rustical_store::access::{self, Resolved};
@@ -12,10 +11,19 @@ use serde::{Deserialize, Deserializer};
 use std::{convert::Infallible, sync::Arc};
 use tower::Service;
 
-#[derive(Constructor)]
 pub struct AddressObjectResourceService<AS: AddressbookStore> {
     pub(crate) addr_store: Arc<AS>,
     pub(crate) share_store: Arc<dyn ShareStore>,
+}
+
+impl<AS: AddressbookStore> AddressObjectResourceService<AS> {
+    #[must_use]
+    pub const fn new(addr_store: Arc<AS>, share_store: Arc<dyn ShareStore>) -> Self {
+        Self {
+            addr_store,
+            share_store,
+        }
+    }
 }
 
 impl<AS: AddressbookStore> Clone for AddressObjectResourceService<AS> {

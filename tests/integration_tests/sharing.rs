@@ -192,7 +192,7 @@ const DEPTH1: &[(&str, &str)] = &[("Depth", "1")];
 async fn test_sharees_see_the_shared_collections() {
     let (_context, app) = setup().await;
 
-    // R1: in bob's home, with the owner and read-only privileges
+    // in bob's home, with the owner and read-only privileges
     let home = call(
         &app,
         "PROPFIND",
@@ -315,7 +315,7 @@ async fn test_reads_through_a_share_show_views() {
         .await
         .unwrap();
 
-    // PUBLIC in full but without alarms; PRIVATE busy only; CONFIDENTIAL hidden (R3)
+    // PUBLIC in full but without alarms; PRIVATE busy only; CONFIDENTIAL hidden
     let public = ok(&app, "GET", &format!("{BOB_CAL}/public.ics"), BOB, "").await;
     assert!(public.body.contains("SUMMARY:Lunch"));
     assert!(!public.body.contains("VALARM"));
@@ -737,7 +737,7 @@ async fn test_writes_through_a_share() {
             .is_ok()
     );
 
-    // R2: a sharee may make an object invisible to itself
+    // a sharee may make an object invisible to itself
     let start = call(
         &app,
         "REPORT",
@@ -847,7 +847,7 @@ async fn test_writes_through_a_share() {
 #[tokio::test]
 async fn test_sharee_view_properties() {
     let (_context, app) = setup().await;
-    // R7: name and color for the sharee only
+    // name and color for the sharee only
     let answer = ok(
         &app,
         "PROPPATCH",
@@ -978,7 +978,7 @@ async fn test_share_lifecycle() {
         .unwrap();
     ok(&app, "GET", &format!("{BOB_CAL}/bob.ics"), BOB, "").await;
 
-    // R4: the sharee removes the share; the owner keeps the calendar
+    // the sharee removes the share; the owner keeps the calendar
     ok(&app, "DELETE", BOB_CAL, BOB, "").await;
     assert_eq!(
         call(&app, "PROPFIND", BOB_CAL, Some(BOB), &[], "")
@@ -986,7 +986,7 @@ async fn test_share_lifecycle() {
             .status,
         StatusCode::NOT_FOUND
     );
-    // R5: the owner sees who it is shared with
+    // the owner sees who it is shared with
     let listed: Vec<_> = shares
         .list_calendar_shares("user", "cal")
         .await
@@ -1003,7 +1003,7 @@ async fn test_share_lifecycle() {
             .is_ok()
     );
 
-    // R6: the owner ends a share
+    // the owner ends a share
     shares
         .unshare_calendar("user", "cal", "group.team")
         .await
@@ -1354,7 +1354,7 @@ async fn test_oidc_login_keeps_the_email_current() {
         Some("bob")
     );
     assert_eq!(shares.principal_email("dave").await.unwrap(), None);
-    // R8: shares by e-mail address
+    // shares by e-mail address
     let share = shares
         .share_calendar("user", "cal", "DAVE@example.org", Access::Read, None)
         .await;
@@ -1917,7 +1917,7 @@ mod frontend {
                 .await
                 .unwrap()
         };
-        // R10: CONFIDENTIAL never above PRIVATE
+        // CONFIDENTIAL never above PRIVATE
         let answer = call(
             &app,
             "POST",

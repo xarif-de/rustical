@@ -135,7 +135,9 @@ impl Component {
         for item in &self.items {
             match item {
                 // Folded, with the line break
-                Item::Property(line) => output.push_str(&line.generate()),
+                Item::Property(line) => line
+                    .generate(output)
+                    .expect("Formatting to a string is infallible"),
                 Item::Component(component) => component.emit(output),
             }
         }

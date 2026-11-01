@@ -79,6 +79,7 @@ allow_sign_up = true
 
     #[test]
     fn test_config_env_http_host() {
+        #[allow(clippy::result_large_err)]
         Jail::expect_with(|jail| {
             jail.set_env(
                 "RUSTICAL_DATA_STORE__SQLITE__DB_URL",
@@ -131,6 +132,7 @@ allow_sign_up = true
 
     #[test]
     fn test_config_env_http_bind() {
+        #[allow(clippy::result_large_err)]
         Jail::expect_with(|jail| {
             jail.set_env(
                 "RUSTICAL_DATA_STORE__SQLITE__DB_URL",
@@ -152,6 +154,7 @@ allow_sign_up = true
 
     #[test]
     fn test_config_env_http_unix() {
+        #[allow(clippy::result_large_err)]
         Jail::expect_with(|jail| {
             jail.set_env(
                 "RUSTICAL_DATA_STORE__SQLITE__DB_URL",

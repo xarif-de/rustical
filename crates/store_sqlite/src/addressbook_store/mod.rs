@@ -3,7 +3,6 @@ use crate::BEGIN_IMMEDIATE;
 use crate::share_store::addressbook_name_shared;
 use async_trait::async_trait;
 use caldata::parser::ParserError;
-use derive_more::derive::Constructor;
 use rustical_ical::AddressObject;
 use rustical_store::{
     Addressbook, AddressbookReadStore, AddressbookWriteStore, CollectionMetadata,
@@ -38,7 +37,7 @@ impl TryFrom<AddressObjectRow> for (String, AddressObject) {
     }
 }
 
-#[derive(Debug, Clone, Constructor)]
+#[derive(Debug, Clone)]
 pub struct SqliteAddressbookStore {
     db: SqlitePool,
     sender: Sender<CollectionOperation>,
@@ -46,6 +45,19 @@ pub struct SqliteAddressbookStore {
 }
 
 impl SqliteAddressbookStore {
+    #[must_use]
+    pub const fn new(
+        db: SqlitePool,
+        sender: Sender<CollectionOperation>,
+        skip_broken: bool,
+    ) -> Self {
+        Self {
+            db,
+            sender,
+            skip_broken,
+        }
+    }
+
     // Commit "orphaned" objects to the changelog table
     pub async fn repair_orphans(&self) -> Result<(), Error> {
         struct Row {
