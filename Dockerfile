@@ -6,6 +6,8 @@ ARG BUILDPLATFORM
 # cargo use their origins. The final image is scratch: none of this ships.
 ARG XARIF_APK_MIRROR
 ARG XARIF_CARGO_REGISTRY
+# ...and its rustup dist server, for the `rustup target add` below.
+ARG RUSTUP_DIST_SERVER
 RUN if [ -n "${XARIF_APK_MIRROR:-}" ]; then \
       sed -i "s#https*://dl-cdn.alpinelinux.org/alpine#$XARIF_APK_MIRROR#" /etc/apk/repositories; fi \
  && if [ -n "${XARIF_CARGO_REGISTRY:-}" ]; then mkdir -p "$CARGO_HOME" && \
