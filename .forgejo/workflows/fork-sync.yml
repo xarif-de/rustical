@@ -10,13 +10,13 @@ on:
     - cron: '17 */6 * * *'
   workflow_dispatch:
     inputs:
-      TARGET: { description: 'upstream tag instead of the newest release (no quarantine)', required: false, default: '' }
+      TARGET: { description: 'upstream tag (track release) or 40-hex commit of the upstream branch (track branch) instead of the automatic choice', required: false, default: '' }
       DRY_RUN: { description: '1 = compose and report only', required: false, default: '0' }
 jobs:
   sync:
     runs-on: docker
     container:
-      image: ghcr.io/catthehacker/ubuntu:act-22.04@sha256:4cc7cf8329cb079840e1f16ac33fe21f76faa7786873f3b71e4b12a947dad549
+      image: ghcr.io/catthehacker/ubuntu:act-22.04@sha256:f5f5c29208c4fd541704fe7b8df33d3bf620ce4ac46f36853b7abeb0159705c4
     env:
       DAGGER_NO_NAG: '1'
       FORK_BOT_TOKEN: ${{ secrets.FORK_BOT_TOKEN }}
@@ -28,10 +28,21 @@ jobs:
           set -eu
           # >>> dagger-install (identical in every workflow that calls dagger; tests/fork/workflows-tests.sh)
           # CLI version = dagger.json engineVersion: one pin, Renovate-managed.
-          v=$(curl -fsS "$GITHUB_SERVER_URL/base/dagger-modules/raw/branch/main/dagger.json" |
-            sed -n 's/.*"engineVersion": *"v\{0,1\}\([0-9][0-9.]*\)".*/\1/p')
-          test -n "$v"
-          curl -fsSL https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION="$v" BIN_DIR=/usr/local/bin sh
+          # Through the package gateway first (kubernetes/artifact-proxy /generic/dagger caches the
+          # release tarball and checksums.txt; install.sh still checks the sha256), the origin if that
+          # fails — pipefail makes a failed gateway curl fall through. Three tries: one dropped download
+          # (curl 56 from dl.dagger.io, 2026-10-24) failed the run before any check, and a red Renovate
+          # PR waits 6 h for its retry.
+          g=http://10.43.0.51/generic/dagger
+          for i in 1 2 3; do
+            v=$(curl -fsS "$GITHUB_SERVER_URL/base/dagger-modules/raw/branch/main/dagger.json" |
+              sed -n 's/.*"engineVersion": *"v\{0,1\}\([0-9][0-9.]*\)".*/\1/p') && test -n "$v" &&
+              { curl -fsSL --connect-timeout 5 "$g/dagger/install.sh" | sed "s#^base=.*#base=\"$g\"#" |
+                  DAGGER_VERSION="$v" BIN_DIR=/usr/local/bin sh ||
+                curl -fsSL https://dl.dagger.io/dagger/install.sh | DAGGER_VERSION="$v" BIN_DIR=/usr/local/bin sh; } && break
+            [ "$i" -lt 3 ] || exit 1
+            sleep $((i * 10))
+          done
           # <<< dagger-install
           dagger call --progress=plain -m "${GITHUB_SERVER_URL#https://}/base/dagger-modules.git@main" fork-sync \
             --server="$GITHUB_SERVER_URL" --repository="$GITHUB_REPOSITORY" --token=env://FORK_BOT_TOKEN \
