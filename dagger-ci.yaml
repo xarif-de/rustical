@@ -1,0 +1,26 @@
+# xarif fork of lennart-k/rustical — how it works: XARIF.md.
+# Functions: git.xarif.de/base/dagger-modules (docs/ci.md, docs/fork.md).
+image:
+  source: .                       # upstream Dockerfile, unchanged
+  tests: .xarif/image-tests.yaml
+  platforms: [linux/amd64, linux/arm64]
+  publish:
+    branches: []                  # only the fork's release tags v*-xarif.N publish
+fork:
+  upstream: https://github.com/lennart-k/rustical
+  quarantine: 24h
+  branch: xarif
+  infra-paths: [.forgejo/, .xarif/, dagger-ci.yaml, renovate.json, .gitlab-mirror.yaml, .github-mirror.yaml, XARIF.md]
+  migrations: '(^|/)migrations/[^/]+\.sql$'
+  suite:                          # upstream .github/workflows/cicd.yml, replayed
+    image: rust
+    version-from: .github/workflows/cicd.yml#env.RUST_VERSION
+    components: [rustfmt, clippy]
+    tools: [cargo-vet@0.10.2]
+    env:
+      RUSTFLAGS: -D warnings      # actions-rust-lang/setup-rust-toolchain's default upstream
+    steps:
+      - cargo fmt --all -- --check
+      - cargo clippy -- -D warnings
+      - cargo test --all-features --workspace
+      - cargo vet --locked
