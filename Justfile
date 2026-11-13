@@ -22,3 +22,17 @@ test-setup:
   export APP_TOKEN=`cargo run principals app-token create user --name "Test Token"`
   echo $APP_TOKEN
 
+
+jaeger-start:
+    podman run -d \
+      --rm \
+      --name jaeger-rustical \
+      -p 16686:16686 \
+      -p 4317:4317  \
+      cr.jaegertracing.io/jaegertracing/jaeger:2.23.0
+
+jaeger-stop:
+    podman stop jaeger-rustical
+
+jaeger-ui:
+    xdg-open http://localhost:16686
