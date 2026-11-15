@@ -17,14 +17,15 @@ allow = [
 [advisories]
 ignore = [
   { id = "RUSTSEC-2023-0071", reason = "We don't really use RSA" },
-  # crypto-bigint 0.5 only comes in through openidconnect's p256/p384, which only verify ID token signatures with public keys.
-  # The 0.7 line (web-push signs with our VAPID key) is kept at a fixed version by [bans].
-  { id = "RUSTSEC-2026-0387", reason = "crypto-bigint 0.5 only verifies signatures with public keys" },
   { id = "RUSTSEC-2026-0374", reason = "basic-toml is only used by the askama proc-macro at build time" },
+  # sqlx-sqlite 0.9.0 caps libsqlite3-sys below 0.38 (the fix is in 0.39); sqlx main lifts the cap but is unreleased.
+  # The advisory needs a database plus -wal file written by a less trusted party; rustical only opens its own
+  # configured db_url (and :memory:), never a user-supplied database file. Drop this once sqlx >= 0.9.1 is out.
+  { id = "RUSTSEC-2026-0459", reason = "sqlx 0.9.0 caps libsqlite3-sys <0.38; only our own DB+WAL is opened; drop on sqlx >= 0.9.1" },
 ]
 
 [bans]
 deny = [
     { crate = "openssl-sys", reason = "If we need openssl we need to watch out with linking" },
-    { crate = "crypto-bigint:>=0.6, <0.7.6", reason = "RUSTSEC-2026-0387, ignored above for the 0.5 line only" },
+    { crate = "crypto-bigint:>=0.6, <0.7.6", reason = "RUSTSEC-2026-0387; the 0.7 line signs with our VAPID key (web-push)" },
 ]
