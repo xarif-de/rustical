@@ -1,0 +1,3 @@
+# The cluster pulls registry.gitlab.com/xarif/docker/rustical (kubernetes/forgejo README).
+features:
+  container_registry: enabled
