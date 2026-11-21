@@ -36,10 +36,11 @@ pub async fn route_post<AS: AddressbookStore, DP: DavPushStore>(
     let sub_id = uuid::Uuid::new_v4().to_string();
 
     // At most a week: after a share ends a former sharee gets content-free pings at most this long
-    let latest = chrono::Utc::now().fixed_offset() + chrono::Duration::weeks(1);
+    let latest = chrono::Utc::now() + chrono::Duration::weeks(1);
     let expires = if let Some(expires) = request.expires {
         chrono::DateTime::parse_from_rfc2822(&expires)
             .map_err(Error::from)?
+            .to_utc()
             .min(latest)
     } else {
         latest
@@ -53,7 +54,7 @@ pub async fn route_post<AS: AddressbookStore, DP: DavPushStore>(
             .push_resource
             .clone(),
         topic: addressbook_resource.addressbook.push_topic,
-        expiration: expires.naive_local(),
+        expiration: expires,
         public_key: request
             .subscription
             .web_push_subscription

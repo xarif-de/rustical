@@ -26,8 +26,7 @@ pub async fn route_import<C: CalendarStore, DP: DavPushStore>(
     access::check_home(&user, &principal)?;
 
     let overwrite = overwrite
-        .map(|TypedHeader(overwrite)| overwrite)
-        .unwrap_or_default()
+        .map_or_default(|TypedHeader(overwrite)| overwrite)
         .into();
 
     let parser = IcalParser::from_slice(body.as_bytes());
