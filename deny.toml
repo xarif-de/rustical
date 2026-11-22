@@ -22,6 +22,11 @@ ignore = [
   # The advisory needs a database plus -wal file written by a less trusted party; rustical only opens its own
   # configured db_url (and :memory:), never a user-supplied database file. Drop this once sqlx >= 0.9.1 is out.
   { id = "RUSTSEC-2026-0459", reason = "sqlx 0.9.0 caps libsqlite3-sys <0.38; only our own DB+WAL is opened; drop on sqlx >= 0.9.1" },
+  # chrono and chrono-tz are declared unmaintained without a successor release; rustical, sqlx, openidconnect and
+  # web-push all build on them, so there is nothing to upgrade to. Neither advisory is a vulnerability; a real one
+  # gets its own RUSTSEC id and still fails. Drop once upstream moves off chrono (e.g. to jiff).
+  { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained, no successor; used throughout rustical and its deps; not a vulnerability" },
+  { id = "RUSTSEC-2026-0555", reason = "chrono-tz unmaintained, no successor; used throughout rustical and its deps; not a vulnerability" },
 ]
 
 [bans]
