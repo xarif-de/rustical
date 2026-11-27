@@ -17,6 +17,7 @@ fork:
     version-from: .github/workflows/cicd.yml#env.RUST_VERSION
     components: [rustfmt, clippy]
     tools: [cargo-vet@0.10.2]
+    cache: mbx                    # mr-boxington + Storage Box archive (base/dagger-modules docs/fork.md)
     env:
       RUSTFLAGS: -D warnings      # actions-rust-lang/setup-rust-toolchain's default upstream
     steps:
